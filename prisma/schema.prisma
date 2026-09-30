@@ -1,0 +1,37 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+model Guia {
+  id           Int       @id @default(autoincrement())
+  nombre       String
+  telefono     String
+  modalidades  String
+  embarcacion  String
+  servicios    String?
+  precioBase   Float
+  precioFull   Float?
+  capacidadMax Int       @default(3)
+  reservas     Reserva[] // Relación: Un guía puede tener múltiples reservas
+}
+
+model Reserva {
+  id              Int      @id @default(autoincrement())
+  clienteNombre   String
+  clienteTelefono String
+  fechaExcursion  DateTime
+  cantPersonas    Int      @default(1)
+  tipoServicio    String   // "BASE" o "FULL"
+  precioTotal     Float
+  estado          String   @default("PENDIENTE") // "PENDIENTE", "CONFIRMADA", "CANCELADA"
+  creadoEn        DateTime @default(now())
+
+  // Clave foránea que relaciona la reserva con un Guía
+  guiaId          Int
+  guia            Guia     @relation(fields: [guiaId], references: [id], onDelete: Cascade)
+}
