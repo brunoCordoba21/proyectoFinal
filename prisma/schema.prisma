@@ -7,31 +7,63 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+enum Rol {
+  ADMIN
+  GUIA
+  CLIENTE
+}
+
+model Usuario {
+  id        Int      @id @default(autoincrement())
+  email     String   @unique
+  password  String   @default("123456")
+  nombre    String
+  rol       Rol      @default(CLIENTE)
+  createdAt DateTime @default(now())
+
+  guia      Guia?
+  cliente   Cliente?
+}
+
 model Guia {
   id           Int       @id @default(autoincrement())
-  nombre       String
   telefono     String
-  modalidades  String
-  embarcacion  String
+  modalidades  String?
+  embarcacion  String?
   servicios    String?
   precioBase   Float
   precioFull   Float?
   capacidadMax Int       @default(3)
-  reservas     Reserva[] // Relación: Un guía puede tener múltiples reservas
+
+  usuarioId    Int       @unique
+  usuario      Usuario   @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+
+  reservas     Reserva[]
+}
+
+model Cliente {
+  id        Int       @id @default(autoincrement())
+  telefono  String?
+
+  usuarioId Int       @unique
+  usuario   Usuario   @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+
+  reservas  Reserva[]
 }
 
 model Reserva {
-  id              Int      @id @default(autoincrement())
-  clienteNombre   String
-  clienteTelefono String
-  fechaExcursion  DateTime
-  cantPersonas    Int      @default(1)
-  tipoServicio    String   // "BASE" o "FULL"
-  precioTotal     Float
-  estado          String   @default("PENDIENTE") // "PENDIENTE", "CONFIRMADA", "CANCELADA"
-  creadoEn        DateTime @default(now())
+  id             Int      @id @default(autoincrement())
+  fechaExcursion DateTime
+  cantPersonas   Int
+  tipoServicio   String
+  precioTotal    Float
+  estado         String   @default("PENDIENTE")
 
-  // Clave foránea que relaciona la reserva con un Guía
-  guiaId          Int
-  guia            Guia     @relation(fields: [guiaId], references: [id], onDelete: Cascade)
+  guiaId         Int
+  guia           Guia     @relation(fields: [guiaId], references: [id])
+
+  clienteId      Int
+  cliente        Cliente  @relation(fields: [clienteId], references: [id])
+
+  createdAt      DateTime @default(now())
 }
