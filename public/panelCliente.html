@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Pesca Las Termas - Panel de Cliente</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <link rel="stylesheet" href="css/style.css">
+  <link rel="stylesheet" href="css/styleCliente.css">
+</head>
+<body>
+
+  <!-- NAVBAR -->
+  <nav class="navbar" id="main-navbar">
+    <div class="brand">
+      <h2><i class="fa-solid fa-water"></i> Pesca Las Termas</h2>
+    </div>
+    <div id="user-status-bar" style="display: flex; align-items: center; gap: 15px;"></div>
+  </nav>
+
+  <!-- CONTENIDO PRINCIPAL CLIENTE -->
+  <section class="container" style="margin-top: 30px;">
+    <div style="margin-bottom: 30px;">
+      <h1 style="font-size: 1.8rem; margin-bottom: 5px;">¡Bienvenido a tu Panel! 🎣</h1>
+      <p style="color: var(--text-muted);">Elegí tu guía de confianza, consultá fechas y programá tu próxima excursión.</p>
+    </div>
+
+    <!-- Catálogo de Guías Disponibles -->
+    <div class="card" style="margin-bottom: 30px;">
+      <h3 style="margin-top: 0; margin-bottom: 15px;"><i class="fa-solid fa-ship"></i> Guías Disponibles para Reservar</h3>
+      <div id="grid-guias-cliente" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 15px;">
+        <!-- Se cargan dinámicamente -->
+      </div>
+    </div>
+
+    <!-- Mis Reservas -->
+    <div class="card">
+      <h3 style="margin-top: 0; margin-bottom: 15px;"><i class="fa-solid fa-calendar-check"></i> Mis Reservas</h3>
+      <div class="table-container">
+        <table>
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>Guía</th>
+              <th>Fecha Excursión</th>
+              <th>Personas</th>
+              <th>Servicio</th>
+              <th>Estado</th>
+            </tr>
+          </thead>
+          <tbody id="tabla-mis-reservas">
+            <tr><td colspan="6" style="text-align: center; color: var(--text-muted);">Cargando reservas...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <!-- MODAL DE RESERVA -->
+  <div id="modal-reserva" class="modal-overlay" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); justify-content: center; align-items: center; z-index: 1000;">
+    <div class="modal-content" style="background: white; padding: 25px; border-radius: 8px; width: 100%; max-width: 400px;">
+      <h3 id="modal-reserva-titulo" style="margin-top: 0; margin-bottom: 20px;"><i class="fa-solid fa-calendar-plus"></i> Reservar Excursión</h3>
+      <form id="form-reserva">
+        <input type="hidden" id="reserva-guia-id">
+        <input type="hidden" id="reserva-precio-base">
+
+        <div style="margin-bottom: 15px;">
+          <label>Fecha de la Excursión</label>
+          <input type="date" id="reserva-fecha" required style="width: 100%; padding: 8px; margin-top: 5px; box-sizing: border-box;">
+        </div>
+
+        <div style="margin-bottom: 15px;">
+          <label>Cantidad de Personas</label>
+          <input type="number" id="reserva-personas" min="1" value="1" required style="width: 100%; padding: 8px; margin-top: 5px; box-sizing: border-box;">
+        </div>
+
+        <div style="margin-bottom: 20px;">
+          <label>Tipo de Servicio / Modalidad</label>
+          <input type="text" id="reserva-servicio" placeholder="Ej: Spinning completo" required style="width: 100%; padding: 8px; margin-top: 5px; box-sizing: border-box;">
+        </div>
+
+        <div style="display: flex; gap: 12px;">
+          <button type="submit" class="btn" style="flex: 1;">Confirmar Reserva</button>
+          <button type="button" class="btn btn-danger" style="flex: 1;" onclick="cerrarModalReserva()">Cancelar</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- SCRIPT -->
+  <script src="js/reservas.js"></script>
+</body>
+</html>

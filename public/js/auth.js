@@ -10,6 +10,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
   if (usuarioString) {
     const usuario = JSON.parse(usuarioString);
+    
+    // Si es CLIENTE y está en el index o login, lo mandamos a su panel exclusivo
+    if (usuario.rol === 'CLIENTE' && !window.location.href.includes('panelCliente.html')) {
+      window.location.href = 'panelCliente.html';
+      return;
+    }
+
     if (secLogin) secLogin.style.display = 'none';
     if (secDashboard) secDashboard.style.display = 'block';
     if (navbar) navbar.style.display = 'flex';
@@ -23,7 +30,7 @@ document.addEventListener('DOMContentLoaded', () => {
       `;
       document.getElementById('btn-logout').addEventListener('click', () => {
         localStorage.removeItem('usuario');
-        window.location.reload();
+        window.location.href = 'index.html';
       });
     }
 
@@ -62,7 +69,13 @@ document.addEventListener('DOMContentLoaded', () => {
           };
 
           localStorage.setItem('usuario', JSON.stringify(usuarioData));
-          window.location.reload();
+
+          // REDIRECCIÓN SEGÚN EL ROL AL INICIAR SESIÓN
+          if (usuarioData.rol === 'CLIENTE') {
+            window.location.href = 'panelCliente.html';
+          } else {
+            window.location.reload();
+          }
         } else {
           loginMsg.style.color = 'var(--danger)';
           loginMsg.textContent = data.error || 'Credenciales inválidas';

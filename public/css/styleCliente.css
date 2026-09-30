@@ -1,0 +1,27 @@
+/* Estilos específicos y complementarios para el Panel de Cliente */
+body {
+  background-color: #f8fafc;
+  color: #0f172a;
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  margin: 0;
+  padding: 0;
+}
+
+.container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 20px;
+}
+
+/* Ajustes adicionales para las tarjetas del cliente */
+#grid-guias-cliente .card {
+  background: #ffffff;
+  border-radius: 8px;
+  padding: 20px;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+#grid-guias-cliente .card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+}
