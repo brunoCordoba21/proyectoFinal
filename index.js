@@ -1,18 +1,26 @@
 const express = require('express');
-const path = require('path');
+const cors = require('cors');
+
+// Importar rutas
+const usuarioRoutes = require('./routes/usuario.routes');
+const guiaRoutes = require('./routes/guia.routes');
+const reservaRoutes = require('./routes/reserva.routes');
+const clienteRoutes = require('./routes/cliente.routes');
+
 const app = express();
+const PORT = process.env.PORT || 3000;
 
+// Middlewares
+app.use(cors());
 app.use(express.json());
-app.use(express.static(path.join(__dirname, 'public')));
+app.use(express.static('public'));
 
-// Rutas de la API
-const rutasGuias = require('./routes/guia.routes');
-const rutasReservas = require('./routes/reserva.routes');
+// Endpoints API
+app.use('/api/usuarios', usuarioRoutes);
+app.use('/api/guias', guiaRoutes);
+app.use('/api/reservas', reservaRoutes);
+app.use('/api/clientes', clienteRoutes);
 
-app.use('/api/guias', rutasGuias);
-app.use('/api/reservas', rutasReservas); // <--- NUEVA RUTA REGISTRADA
-
-const PORT = 3000;
 app.listen(PORT, () => {
-  console.log(`Servidor activo en http://localhost:${PORT}`);
+  console.log(`🚀 Servidor listo en http://localhost:${PORT}`);
 });
