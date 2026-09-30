@@ -1,16 +1,15 @@
-const express = require('express');
-const router = express.Router();
-const {
-  obtenerGuias,
-  obtenerGuiaPorId,
-  registrarGuia,
-  actualizarGuia,
-  eliminarGuia
+const { Router } = require('express');
+const router = Router();
+
+const { 
+  obtenerGuias, 
+  crearGuia, 
+  actualizarGuia, 
+  eliminarGuia 
 } = require('../controllers/guia.controller');
 
 router.get('/', obtenerGuias);
-router.get('/:id', obtenerGuiaPorId);
-router.post('/', registrarGuia);
+router.post('/', crearGuia);
 router.put('/:id', actualizarGuia);
 router.delete('/:id', eliminarGuia);
 

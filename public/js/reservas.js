@@ -1,123 +1,102 @@
-const API_RESERVAS_URL = '/api/reservas';
-const API_GUIAS_URL = '/api/guias';
+document.addEventListener('DOMContentLoaded', () => {
+  const formReserva = document.getElementById('form-reserva');
 
-// 1. Cargar la lista desplegable de Guías en el formulario de reservas
-async function cargarSelectGuias() {
-  try {
-    const res = await fetch(API_GUIAS_URL);
-    const guias = await res.json();
-    const select = document.getElementById('guiaSelect');
-    
-    select.innerHTML = '<option value="">-- Seleccionar Guía --</option>';
-    guias.forEach(g => {
-      select.innerHTML += `<option value="${g.id}">${g.nombre} (Cap. máx: ${g.capacidadMax} pers.)</option>`;
+  if (formReserva) {
+    formReserva.addEventListener('submit', async (e) => {
+      e.preventDefault();
+
+      const userString = localStorage.getItem('usuario');
+      const usuario = userString ? JSON.parse(userString) : { id: 1 };
+
+      const payload = {
+        guiaId: Number(document.getElementById('reserva-guia').value),
+        clienteId: usuario.id || 1, 
+        fechaExcursion: document.getElementById('reserva-fecha').value,
+        cantPersonas: Number(document.getElementById('reserva-personas').value),
+        tipoServicio: document.getElementById('reserva-servicio').value,
+        precioTotal: Number(document.getElementById('reserva-precio').value)
+      };
+
+      try {
+        const res = await fetch('/api/reservas', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+
+        if (res.ok) {
+          alert('¡Reserva creada con éxito!');
+          formReserva.reset();
+          cargarReservas();
+        } else {
+          const data = await res.json();
+          alert('Error: ' + (data.error || 'No se pudo registrar la reserva'));
+        }
+      } catch (err) {
+        alert('Error de red al intentar crear la reserva');
+      }
     });
-  } catch (error) {
-    console.error('Error al cargar la lista de guías:', error);
   }
-}
+});
 
-// 2. GET - Cargar todas las reservas guardadas
-async function cargarReservas() {
+async function cargarSelectGuias() {
+  const select = document.getElementById('reserva-guia');
+  if (!select) return;
+
   try {
-    const res = await fetch(API_RESERVAS_URL);
-    const reservas = await res.json();
-    const contenedor = document.getElementById('listaReservas');
-    contenedor.innerHTML = '';
+    const res = await fetch('/api/guias');
+    const guias = await res.json();
 
-    if (reservas.length === 0) {
-      contenedor.innerHTML = '<p>No hay reservas registradas aún.</p>';
+    if (!Array.isArray(guias) || guias.length === 0) {
+      select.innerHTML = '<option value="">No hay guías disponibles</option>';
       return;
     }
 
-    reservas.forEach(r => {
-      // Formatear la fecha a formato local
-      const fecha = new Date(r.fechaExcursion).toLocaleDateString('es-AR', {
-        day: '2-digit', month: '2-digit', year: 'numeric', timeZone: 'UTC'
-      });
-
-      // Definir clase del badge según el estado
-      let claseEstado = 'badge-pendiente';
-      if (r.estado === 'CONFIRMADA') claseEstado = 'badge-confirmada';
-      if (r.estado === 'CANCELADA') claseEstado = 'badge-cancelada';
-
-      contenedor.innerHTML += `
-        <div class="card card-reserva">
-          <div>
-            <div style="display: flex; justify-content: space-between; align-items: center;">
-              <h3>Reserva #${r.id}</h3>
-              <span class="badge ${claseEstado}">${r.estado}</span>
-            </div>
-            <p><strong>Cliente:</strong> ${r.clienteNombre}</p>
-            <p><strong>Teléfono:</strong> ${r.clienteTelefono}</p>
-            <p><strong>Guía Asignado:</strong> ${r.guia ? r.guia.nombre : 'Guía N/A'}</p>
-            <p><strong>Fecha Salida:</strong> ${fecha}</p>
-            <p><strong>Personas:</strong> ${r.cantPersonas}</p>
-            <p><strong>Servicio:</strong> ${r.tipoServicio}</p>
-            <p><strong>Precio Total:</strong> $${r.precioTotal}</p>
-          </div>
-          
-          <div class="card-actions" style="flex-wrap: wrap;">
-            ${r.estado !== 'CONFIRMADA' ? `<button class="btn-state btn-confirm" onclick="cambiarEstadoReserva(${r.id}, 'CONFIRMADA')">Confirmar</button>` : ''}
-            ${r.estado !== 'CANCELADA' ? `<button class="btn-state btn-cancel-state" onclick="cambiarEstadoReserva(${r.id}, 'CANCELADA')">Cancelar</button>` : ''}
-            <button class="btn-delete" onclick="eliminarReserva(${r.id})">Eliminar</button>
-          </div>
-        </div>
-      `;
-    });
-  } catch (error) {
-    console.error('Error al cargar reservas:', error);
+    select.innerHTML = '<option value="">-- Seleccioná un guía --</option>' + 
+      guias.map(g => `<option value="${g.id}">${g.nombre} (Base: $${g.precioBase})</option>`).join('');
+  } catch (err) {
+    select.innerHTML = '<option value="">Error al cargar guías</option>';
   }
 }
 
-// 3. POST - Guardar una nueva reserva
-document.getElementById('formReserva').addEventListener('submit', async (e) => {
-  e.preventDefault();
+async function cargarReservas() {
+  const tbody = document.getElementById('tabla-reservas');
+  if (!tbody) return;
 
-  const datosReserva = {
-    clienteNombre: document.getElementById('clienteNombre').value,
-    clienteTelefono: document.getElementById('clienteTelefono').value,
-    guiaId: document.getElementById('guiaSelect').value,
-    fechaExcursion: document.getElementById('fechaExcursion').value,
-    cantPersonas: document.getElementById('cantPersonas').value,
-    tipoServicio: document.getElementById('tipoServicio').value,
-  };
+  const userString = localStorage.getItem('usuario');
+  const usuario = userString ? JSON.parse(userString) : null;
 
-  const res = await fetch(API_RESERVAS_URL, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(datosReserva)
-  });
+  try {
+    const res = await fetch('/api/reservas');
+    let reservas = await res.json();
 
-  const respuesta = await res.json();
+    if (!Array.isArray(reservas) || reservas.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="7" style="text-align: center; color: var(--text-muted);">No hay reservas registradas.</td></tr>';
+      return;
+    }
 
-  if (!res.ok) {
-    alert(`⚠️ Error: ${respuesta.error}`);
-    return;
-  }
+    // Si es GUÍA, filtramos para que solo vea las reservas asignadas a su ID de guía o usuario
+    if (usuario && usuario.rol === 'GUIA') {
+      reservas = reservas.filter(r => r.guia && (r.guia.usuarioId === usuario.id || r.guiaId === usuario.id));
+    }
 
-  document.getElementById('formReserva').reset();
-  cargarReservas();
-});
+    if (reservas.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="7" style="text-align: center; color: var(--text-muted);">No tenés salidas asignadas por el momento.</td></tr>';
+      return;
+    }
 
-// 4. PUT - Cambiar estado (CONFIRMADA / CANCELADA)
-async function cambiarEstadoReserva(id, nuevoEstado) {
-  await fetch(`${API_RESERVAS_URL}/${id}`, {
-    method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ estado: nuevoEstado })
-  });
-  cargarReservas();
-}
-
-// 5. DELETE - Eliminar reserva
-async function eliminarReserva(id) {
-  if (confirm('¿Estás seguro de que querés eliminar esta reserva?')) {
-    await fetch(`${API_RESERVAS_URL}/${id}`, { method: 'DELETE' });
-    cargarReservas();
+    tbody.innerHTML = reservas.map(r => `
+      <tr>
+        <td><strong>#${r.id}</strong></td>
+        <td>${new Date(r.fechaExcursion).toLocaleString()}</td>
+        <td>${r.guia ? r.guia.nombre : 'Guía #' + r.guiaId}</td>
+        <td>${r.cantPersonas} personas</td>
+        <td><span style="background: #f1f5f9; padding: 4px 8px; border-radius: 6px; font-size: 0.85rem;">${r.tipoServicio}</span></td>
+        <td><strong>$${r.precioTotal.toLocaleString()}</strong></td>
+        <td><span style="color: var(--success); font-weight: 600; font-size: 0.85rem;"><i class="fa-solid fa-circle-check"></i> ${r.estado || 'CONFIRMADA'}</span></td>
+      </tr>
+    `).join('');
+  } catch (err) {
+    tbody.innerHTML = '<tr><td colspan="7" style="text-align: center; color: var(--danger);">Error al cargar las reservas.</td></tr>';
   }
 }
-
-// Inicializar datos al cargar la solapa
-cargarSelectGuias();
-cargarReservas();
