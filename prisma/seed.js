@@ -2,8 +2,8 @@ const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
 
 async function main() {
-  // Crear Admin Bruno
-  await prisma.usuario.upsert({
+  // Crear Admin (no requiere campos de Guia)
+  const admin = await prisma.usuario.upsert({
     where: { email: 'bruno@admin.com' },
     update: {},
     create: {
@@ -14,24 +14,12 @@ async function main() {
     }
   });
 
-  // Crear Admin Brenda
-  await prisma.usuario.upsert({
-    where: { email: 'brenda@admin.com' },
-    update: {},
-    create: {
-      nombre: 'Brenda Córdoba',
-      email: 'brenda@admin.com',
-      password: '123',
-      rol: 'ADMIN'
-    }
-  });
-
-  console.log('✅ Administradores cargados correctamente.');
+  console.log('✅ Admin creado/verificado:', admin.email);
 }
 
 main()
   .catch((e) => {
-    console.error(e);
+    console.error('❌ Error en el seed:', e);
     process.exit(1);
   })
   .finally(async () => {

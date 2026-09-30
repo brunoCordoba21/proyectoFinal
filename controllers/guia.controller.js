@@ -10,8 +10,8 @@ const obtenerGuias = async (req, res) => {
 
     const respuesta = guias.map(g => ({
       id: g.id,
-      nombre: g.usuario.nombre,
-      email: g.usuario.email,
+      nombre: g.usuario ? g.usuario.nombre : 'Sin nombre',
+      email: g.usuario ? g.usuario.email : 'Sin email',
       telefono: g.telefono,
       modalidades: g.modalidades,
       embarcacion: g.embarcacion,
@@ -23,6 +23,7 @@ const obtenerGuias = async (req, res) => {
 
     res.json(respuesta);
   } catch (error) {
+    console.error('Error en obtenerGuias:', error);
     res.status(500).json({ error: 'Error al obtener guías' });
   }
 };
@@ -42,8 +43,8 @@ const obtenerGuiaPorId = async (req, res) => {
 
     res.json({
       id: guia.id,
-      nombre: guia.usuario.nombre,
-      email: guia.usuario.email,
+      nombre: guia.usuario ? guia.usuario.nombre : 'Sin nombre',
+      email: guia.usuario ? guia.usuario.email : 'Sin email',
       telefono: guia.telefono,
       modalidades: guia.modalidades,
       embarcacion: guia.embarcacion,
@@ -53,6 +54,7 @@ const obtenerGuiaPorId = async (req, res) => {
       capacidadMax: guia.capacidadMax
     });
   } catch (error) {
+    console.error('Error en obtenerGuiaPorId:', error);
     res.status(500).json({ error: 'Error al obtener el guía' });
   }
 };
@@ -65,20 +67,29 @@ const registrarGuia = async (req, res) => {
       servicios, precioBase, precioFull, capacidadMax 
     } = req.body;
 
-    const emailGuia = email || `guia_${Date.now()}@pesca.com`;
+    if (!nombre) {
+      return res.status(400).json({ error: 'El campo "nombre" es obligatorio' });
+    }
+
+    if (!precioBase) {
+      return res.status(400).json({ error: 'El campo "precioBase" es obligatorio' });
+    }
+
+    // Concatenación estándar con comillas simples (Línea 79 solucionada)
+    const emailGuia = email || ('guia_' + Date.now() + '@pesca.com');
 
     const nuevoUsuarioGuia = await prisma.usuario.create({
       data: {
-        nombre,
+        nombre: nombre,
         email: emailGuia,
         password: "123",
         rol: "GUIA",
         guia: {
           create: {
-            telefono,
-            modalidades,
-            embarcacion,
-            servicios,
+            telefono: telefono || "",
+            modalidades: modalidades,
+            embarcacion: embarcacion,
+            servicios: servicios,
             precioBase: Number(precioBase),
             precioFull: precioFull ? Number(precioFull) : null,
             capacidadMax: capacidadMax ? Number(capacidadMax) : 3,
@@ -90,8 +101,8 @@ const registrarGuia = async (req, res) => {
 
     res.status(201).json(nuevoUsuarioGuia);
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: 'Error al registrar el guía' });
+    console.error('🔥 Error al registrar guía:', error);
+    res.status(500).json({ error: 'Error al registrar el guía', detalle: error.message });
   }
 };
 
@@ -110,7 +121,6 @@ const actualizarGuia = async (req, res) => {
       return res.status(404).json({ error: 'Guía no encontrado' });
     }
 
-    // Actualiza el nombre en la tabla Usuario asociada
     if (nombre) {
       await prisma.usuario.update({
         where: { id: guiaActual.usuarioId },
@@ -118,7 +128,6 @@ const actualizarGuia = async (req, res) => {
       });
     }
 
-    // Actualiza los campos de la tabla Guia
     const guiaActualizado = await prisma.guia.update({
       where: { id: Number(id) },
       data: {
@@ -135,7 +144,8 @@ const actualizarGuia = async (req, res) => {
 
     res.json(guiaActualizado);
   } catch (error) {
-    res.status(500).json({ error: 'Error al actualizar el guía' });
+    console.error('Error en actualizarGuia:', error);
+    res.status(500).json({ error: 'Error al actualizar el guía', detalle: error.message });
   }
 };
 
@@ -145,14 +155,16 @@ const eliminarGuia = async (req, res) => {
     const { id } = req.params;
     const guia = await prisma.guia.findUnique({ where: { id: Number(id) } });
 
-    if (guia) {
-      // Al borrar el Usuario, la DB elimina automáticamente el Guía por onDelete: Cascade
-      await prisma.usuario.delete({ where: { id: guia.usuarioId } });
+    if (!guia) {
+      return res.status(404).json({ error: 'Guía no encontrado' });
     }
+
+    await prisma.usuario.delete({ where: { id: guia.usuarioId } });
 
     res.json({ mensaje: 'Guía eliminado correctamente' });
   } catch (error) {
-    res.status(500).json({ error: 'Error al eliminar el guía' });
+    console.error('Error en eliminarGuia:', error);
+    res.status(500).json({ error: 'Error al eliminar el guía', detalle: error.message });
   }
 };
 
