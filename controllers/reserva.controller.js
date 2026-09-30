@@ -1,100 +1,143 @@
 const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
 
-// 1. GET - Obtener todas las reservas (incluye los datos del Guía asociado)
+// 1. GET - Obtener todas las reservas
 const obtenerReservas = async (req, res) => {
   try {
     const reservas = await prisma.reserva.findMany({
       include: {
-        guia: true // Trae el nombre, teléfono y embarcación del guía
+        guia: { include: { usuario: true } },
+        cliente: { include: { usuario: true } }
       },
-      orderBy: {
-        fechaExcursion: 'asc'
-      }
+      orderBy: { fechaExcursion: 'asc' }
     });
-    res.json(reservas);
+
+    const respuesta = reservas.map(r => ({
+      id: r.id,
+      clienteNombre: r.cliente.usuario.nombre,
+      clienteTelefono: r.cliente.telefono,
+      fechaExcursion: r.fechaExcursion,
+      cantPersonas: r.cantPersonas,
+      tipoServicio: r.tipoServicio,
+      precioTotal: r.precioTotal,
+      estado: r.estado,
+      guiaId: r.guia.id,
+      guiaNombre: r.guia.usuario.nombre
+    }));
+
+    res.json(respuesta);
   } catch (error) {
     res.status(500).json({ error: 'Error al obtener las reservas' });
   }
 };
 
-// 2. POST - Crear una nueva reserva con validaciones de negocio
+// 2. GET BY ID - Obtener una sola reserva por ID
+const obtenerReservaPorId = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const reserva = await prisma.reserva.findUnique({
+      where: { id: Number(id) },
+      include: {
+        guia: { include: { usuario: true } },
+        cliente: { include: { usuario: true } }
+      }
+    });
+
+    if (!reserva) {
+      return res.status(404).json({ error: 'Reserva no encontrada' });
+    }
+
+    res.json({
+      id: reserva.id,
+      clienteNombre: reserva.cliente.usuario.nombre,
+      clienteTelefono: reserva.cliente.telefono,
+      fechaExcursion: reserva.fechaExcursion,
+      cantPersonas: reserva.cantPersonas,
+      tipoServicio: reserva.tipoServicio,
+      precioTotal: reserva.precioTotal,
+      estado: reserva.estado,
+      guiaId: reserva.guia.id,
+      guiaNombre: reserva.guia.usuario.nombre
+    });
+  } catch (error) {
+    res.status(500).json({ error: 'Error al obtener la reserva' });
+  }
+};
+
+// 3. POST - Crear una nueva reserva
 const crearReserva = async (req, res) => {
   try {
     const { 
-      clienteNombre, clienteTelefono, fechaExcursion, 
-      cantPersonas, tipoServicio, guiaId 
+      clienteNombre, clienteTelefono, clienteEmail,
+      fechaExcursion, cantPersonas, tipoServicio, guiaId, clienteId 
     } = req.body;
 
-    // A. Buscar el guía seleccionado para verificar existencia y capacidad
-    const guia = await prisma.guia.findUnique({
-      where: { id: Number(guiaId) }
-    });
+    let idClienteFinal = clienteId;
 
-    if (!guia) {
-      return res.status(404).json({ error: 'El guía seleccionado no existe' });
+    // Si no viene clienteId, crea el cliente al vuelo en la BD
+    if (!idClienteFinal) {
+      const emailCli = clienteEmail || `cliente_${Date.now()}@pesca.com`;
+      const nuevoCliente = await prisma.usuario.create({
+        data: {
+          nombre: clienteNombre || 'Cliente Anónimo',
+          email: emailCli,
+          password: '123',
+          rol: 'CLIENTE',
+          cliente: { create: { telefono: clienteTelefono } }
+        },
+        include: { cliente: true }
+      });
+      idClienteFinal = nuevoCliente.cliente.id;
     }
 
-    // B. Validar capacidad máxima del guía
+    const guia = await prisma.guia.findUnique({ where: { id: Number(guiaId) } });
+    if (!guia) return res.status(404).json({ error: 'Guía no encontrado' });
+
     const personas = Number(cantPersonas);
     if (personas > guia.capacidadMax) {
-      return res.status(400).json({ 
-        error: `La cantidad de personas (${personas}) supera la capacidad máxima del guía (${guia.capacidadMax}).` 
-      });
+      return res.status(400).json({ error: `La capacidad máxima del guía es de ${guia.capacidadMax} personas.` });
     }
 
-    // C. Calcular precio total automáticamente según el tipo de servicio
-    const servicio = tipoServicio.toUpperCase(); // "BASE" o "FULL"
+    const servicio = tipoServicio.toUpperCase();
     let precioUnitario = guia.precioBase;
+    if (servicio === 'FULL' && guia.precioFull) precioUnitario = guia.precioFull;
 
-    if (servicio === 'FULL' && guia.precioFull) {
-      precioUnitario = guia.precioFull;
-    }
-
-    const precioTotal = precioUnitario;
-
-    // D. Guardar la reserva en la base de datos
     const nuevaReserva = await prisma.reserva.create({
       data: {
-        clienteNombre,
-        clienteTelefono,
         fechaExcursion: new Date(fechaExcursion),
         cantPersonas: personas,
         tipoServicio: servicio,
-        precioTotal,
-        guiaId: Number(guiaId)
-      },
-      include: {
-        guia: true
+        precioTotal: precioUnitario,
+        guiaId: Number(guiaId),
+        clienteId: Number(idClienteFinal)
       }
     });
 
     res.status(201).json(nuevaReserva);
-
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: 'Error al registrar la reserva' });
   }
 };
 
-// 3. PUT - Cambiar el estado de la reserva ("CONFIRMADA", "CANCELADA")
+// 4. PUT - Actualizar el estado de la reserva ("CONFIRMADA", "CANCELADA")
 const actualizarEstadoReserva = async (req, res) => {
   try {
     const { id } = req.params;
     const { estado } = req.body;
 
-    const reservaActualizada = await prisma.reserva.update({
+    const reserva = await prisma.reserva.update({
       where: { id: Number(id) },
       data: { estado: estado.toUpperCase() }
     });
 
-    res.json(reservaActualizada);
+    res.json(reserva);
   } catch (error) {
     res.status(500).json({ error: 'Error al actualizar la reserva' });
   }
 };
 
-// 4. DELETE - Cancelar/Eliminar reserva
+// 5. DELETE - Cancelar/Eliminar reserva
 const eliminarReserva = async (req, res) => {
   try {
     const { id } = req.params;
@@ -110,6 +153,7 @@ const eliminarReserva = async (req, res) => {
 
 module.exports = {
   obtenerReservas,
+  obtenerReservaPorId,
   crearReserva,
   actualizarEstadoReserva,
   eliminarReserva
