@@ -1,46 +1,88 @@
+let mesCalendario = new Date().getMonth();
+let anioCalendario = new Date().getFullYear();
+let fechasOcupadas = [];
+let guiaSeleccionado = null;
+
+// Inicializa la página y configura los eventos principales
 document.addEventListener('DOMContentLoaded', () => {
   const userString = localStorage.getItem('usuario');
   if (!userString) {
-    window.location.href = 'index.html'; // Si no hay sesión, al login
+    window.location.href = 'index.html';
     return;
   }
 
   const usuario = JSON.parse(userString);
-  
-  // Mostrar datos del usuario en la barra superior si existe el elemento
+
+  // Muestra el usuario y configura el cierre de sesión
   const statusBar = document.getElementById('user-status-bar');
   if (statusBar) {
     statusBar.innerHTML = `
-      <span style="background: #eff6ff; color: #2563eb; padding: 6px 12px; border-radius: 20px; font-size: 0.85rem; font-weight: 600;">
-        <i class="fa-solid fa-user"></i> ${usuario.nombre} (Cliente)
+      <span style="background:#eff6ff;color:#2563eb;padding:6px 12px;border-radius:20px;font-size:.85rem;font-weight:600;">
+        <i class="fa-solid fa-user"></i>
+        ${usuario.nombre} (Cliente)
       </span>
-      <button id="btn-logout" class="btn btn-danger" style="padding: 6px 12px; font-size: 0.85rem;">Salir</button>
+      <button id="btn-logout" class="btn btn-danger" style="padding:6px 12px;font-size:.85rem;">
+        Salir
+      </button>
     `;
+
     document.getElementById('btn-logout').addEventListener('click', () => {
       localStorage.removeItem('usuario');
       window.location.href = 'index.html';
     });
   }
 
-  // Cargar catálogos iniciales
   cargarGuiasCliente();
-  cargarMisReservas(usuario.id);
+  cargarMisReservas(usuario.clienteId);
 
-  // Manejar envío del formulario de reserva desde el modal
+  // Cambia al mes anterior
+  const btnAnterior = document.getElementById('btn-mes-anterior');
+  if (btnAnterior) {
+    btnAnterior.addEventListener('click', () => {
+      mesCalendario--;
+      if (mesCalendario < 0) {
+        mesCalendario = 11;
+        anioCalendario--;
+      }
+      renderizarCalendario();
+    });
+  }
+
+  // Cambia al mes siguiente
+  const btnSiguiente = document.getElementById('btn-mes-siguiente');
+  if (btnSiguiente) {
+    btnSiguiente.addEventListener('click', () => {
+      mesCalendario++;
+      if (mesCalendario > 11) {
+        mesCalendario = 0;
+        anioCalendario++;
+      }
+      renderizarCalendario();
+    });
+  }
+
+  // Envía una nueva reserva al backend
   const formReserva = document.getElementById('form-reserva');
   if (formReserva) {
     formReserva.addEventListener('submit', async (e) => {
       e.preventDefault();
+
       const guiaId = document.getElementById('reserva-guia-id').value;
       const fechaExcursion = document.getElementById('reserva-fecha').value;
       const cantPersonas = Number(document.getElementById('reserva-personas').value);
       const tipoServicio = document.getElementById('reserva-servicio').value;
       const precioBase = Number(document.getElementById('reserva-precio-base').value) || 0;
-      
+
+      // Verifica que se haya seleccionado una fecha
+      if (!fechaExcursion) {
+        alert('Seleccioná una fecha para la excursión.');
+        return;
+      }
+
       const precioTotal = precioBase * cantPersonas;
 
       const payload = {
-        clienteId: usuario.clienteId || usuario.id,
+        clienteId: usuario.clienteId,
         guiaId: Number(guiaId),
         fechaExcursion,
         cantPersonas,
@@ -51,108 +93,309 @@ document.addEventListener('DOMContentLoaded', () => {
       try {
         const res = await fetch('/api/reservas', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: {
+            'Content-Type': 'application/json'
+          },
           body: JSON.stringify(payload)
         });
 
         if (res.ok) {
           alert('¡Reserva creada con éxito!');
           cerrarModalReserva();
-          cargarMisReservas(usuario.id);
+          cargarMisReservas(usuario.clienteId);
         } else {
           const err = await res.json();
           alert('Error al reservar: ' + (err.error || 'Intente nuevamente'));
         }
       } catch (err) {
+        console.error(err);
         alert('Error de conexión con el servidor');
       }
     });
   }
 });
 
-// Cargar guías en el panel de cliente
+// Carga los guías disponibles desde el backend
 async function cargarGuiasCliente() {
-  const container = document.getElementById('grid-guias-cliente');
-  if (!container) return;
+  const grid = document.getElementById('grid-guias-cliente');
+  if (!grid) return;
 
   try {
     const res = await fetch('/api/guias');
     const guias = await res.json();
 
-    if (!Array.isArray(guias) || guias.length === 0) {
-      container.innerHTML = '<p style="color: #64748b; grid-column: 1/-1;">No hay guías disponibles en este momento.</p>';
-      return;
-    }
-
-    container.innerHTML = guias.map(g => `
-      <div class="card" style="margin: 0; display: flex; flex-direction: column; justify-content: space-between; border: 1px solid #e2e8f0;">
-        <div>
-          <h3 style="margin: 0 0 10px 0; font-size: 1.1rem; color: #2563eb;"><i class="fa-solid fa-user-ninja"></i> ${g.nombre}</h3>
-          <p style="font-size: 0.85rem; color: #64748b; margin-bottom: 5px;"><i class="fa-solid fa-phone"></i> ${g.telefono || 'Sin teléfono'}</p>
-          <p style="font-size: 0.85rem; color: #64748b; margin-bottom: 5px;"><i class="fa-solid fa-ship"></i> ${g.embarcacion || 'Estándar'}</p>
-          <p style="font-size: 0.85rem; color: #64748b; margin-bottom: 12px;"><i class="fa-solid fa-fish"></i> ${g.modalidades || 'Todas'}</p>
+    grid.innerHTML = guias.map(g => `
+      <div class="guia-card">
+        <div class="guia-icono">
+          <i class="fa-solid fa-fish"></i>
         </div>
-        <div>
-          <div style="font-size: 1.1rem; font-weight: 700; color: #0f172a; margin-bottom: 12px;">
-            $${g.precioBase ? g.precioBase.toLocaleString() : 0} <span style="font-size: 0.75rem; font-weight: normal; color: #64748b;">por pers.</span>
-          </div>
-          <button class="btn" style="width: 100%; padding: 8px; font-size: 0.85rem;" onclick='abrirModalReserva(${g.id}, "${g.nombre}", ${g.precioBase || 0})'>
-            <i class="fa-solid fa-calendar-check"></i> Reservar con este Guía
-          </button>
+        <h4 class="guia-nombre">${g.nombre}</h4>
+        <div class="guia-dato">
+          <i class="fa-solid fa-phone"></i>
+          <span>${g.telefono || 'Teléfono no informado'}</span>
         </div>
+        <div class="guia-dato">
+          <i class="fa-solid fa-fish-fins"></i>
+          <span>${g.modalidades || 'Modalidad no informada'}</span>
+        </div>
+        <div class="guia-dato">
+          <i class="fa-solid fa-ship"></i>
+          <span>${g.embarcacion || 'Embarcación no informada'}</span>
+        </div>
+        <div class="guia-precio">
+          <i class="fa-solid fa-dollar-sign"></i>
+          <span>Desde $${g.precioBase}</span>
+        </div>
+        <button class="btn" onclick="abrirModalReserva(${g.id}, '${g.nombre}', ${g.precioBase})">
+          <i class="fa-solid fa-calendar-plus"></i>
+          Reservar excursión
+        </button>
       </div>
     `).join('');
-  } catch (err) {
-    container.innerHTML = '<p style="color: #ef4444; grid-column: 1/-1;">Error al cargar el catálogo de guías.</p>';
+  } catch (error) {
+    console.error(error);
+    grid.innerHTML = `
+      <p style="color:red;">
+        Error al cargar los guías.
+      </p>
+    `;
   }
 }
 
-// Funciones para el modal de reserva
-function abrirModalReserva(guiaId, guiaNombre, precioBase) {
-  const tituloModal = document.getElementById('modal-reserva-titulo');
-  if (tituloModal) {
-    tituloModal.innerHTML = `<i class="fa-solid fa-calendar-plus"></i> Reservar con ${guiaNombre}`;
-  }
+// Abre el modal y prepara el calendario del guía seleccionado
+async function abrirModalReserva(guiaId, guiaNombre, precioBase) {
+  guiaSeleccionado = guiaId;
+
+  document.getElementById('modal-reserva-titulo').innerHTML = `
+    <i class="fa-solid fa-calendar-plus"></i>
+    Reservar con ${guiaNombre}
+  `;
+
+  document.getElementById('form-reserva').reset();
   document.getElementById('reserva-guia-id').value = guiaId;
   document.getElementById('reserva-precio-base').value = precioBase;
-  
-  const form = document.getElementById('form-reserva');
-  if (form) form.reset();
+  document.getElementById('reserva-fecha').value = '';
+  document.getElementById('fecha-seleccionada').textContent = 'Seleccioná una fecha.';
 
-  const modal = document.getElementById('modal-reserva');
-  if (modal) modal.style.display = 'flex';
+  const ahora = new Date();
+  mesCalendario = ahora.getMonth();
+  anioCalendario = ahora.getFullYear();
+
+  await cargarFechasOcupadas(guiaId);
+  renderizarCalendario();
+
+  document.getElementById('modal-reserva').style.display = 'flex';
 }
 
+// Cierra el modal de reserva
 function cerrarModalReserva() {
-  const modal = document.getElementById('modal-reserva');
-  if (modal) modal.style.display = 'none';
+  document.getElementById('modal-reserva').style.display = 'none';
 }
 
-// Cargar las reservas del usuario en la tabla
-async function cargarMisReservas(usuarioId) {
+// Obtiene las fechas ocupadas por un guía
+async function cargarFechasOcupadas(guiaId) {
+  try {
+    const res = await fetch(`/api/reservas/guia/${guiaId}/fechas`);
+
+    if (!res.ok) {
+      throw new Error('No se pudieron obtener las fechas');
+    }
+
+    const reservas = await res.json();
+
+    fechasOcupadas = reservas.map(r => {
+      const fecha = new Date(r.fechaExcursion);
+      return formatearFecha(fecha);
+    });
+
+    console.log('Fechas ocupadas:', fechasOcupadas);
+  } catch (error) {
+    console.error(error);
+    fechasOcupadas = [];
+  }
+}
+
+// Genera el calendario y marca las fechas ocupadas
+function renderizarCalendario() {
+  const contenedor = document.getElementById('dias-calendario');
+  const titulo = document.getElementById('mes-actual');
+  if (!contenedor || !titulo) return;
+
+  const nombresMeses = [
+    'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
+    'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'
+  ];
+
+  titulo.textContent = `${nombresMeses[mesCalendario]} ${anioCalendario}`;
+  contenedor.innerHTML = '';
+
+  const primerDia = new Date(anioCalendario, mesCalendario, 1);
+  let diaSemana = primerDia.getDay();
+
+  // Ajusta el calendario para comenzar el lunes
+  diaSemana = diaSemana === 0 ? 6 : diaSemana - 1;
+
+  for (let i = 0; i < diaSemana; i++) {
+    contenedor.appendChild(document.createElement('div'));
+  }
+
+  const cantidadDias = new Date(anioCalendario, mesCalendario + 1, 0).getDate();
+
+  for (let dia = 1; dia <= cantidadDias; dia++) {
+    const boton = document.createElement('button');
+    boton.type = 'button';
+    boton.textContent = dia;
+    boton.style.padding = '8px';
+    boton.style.border = '1px solid #ddd';
+    boton.style.borderRadius = '6px';
+    boton.style.cursor = 'pointer';
+    boton.style.background = 'white';
+
+    const fecha = `${anioCalendario}-${String(mesCalendario + 1).padStart(2, '0')}-${String(dia).padStart(2, '0')}`;
+
+    // Deshabilita los días que ya tienen una reserva
+    if (fechasOcupadas.includes(fecha)) {
+      boton.disabled = true;
+      boton.textContent = `${dia} ✕`;
+      boton.style.background = '#fee2e2';
+      boton.style.color = '#dc2626';
+      boton.style.cursor = 'not-allowed';
+    } else {
+      boton.addEventListener('click', () => {
+        document.getElementById('reserva-fecha').value = fecha;
+        document.getElementById('fecha-seleccionada').textContent =
+          `Fecha seleccionada: ${dia}/${mesCalendario + 1}/${anioCalendario}`;
+
+        document.querySelectorAll('#dias-calendario button').forEach(b => {
+          if (!b.disabled) {
+            b.style.background = 'white';
+            b.style.color = 'black';
+          }
+        });
+
+        boton.style.background = '#2563eb';
+        boton.style.color = 'white';
+      });
+    }
+
+    contenedor.appendChild(boton);
+  }
+}
+
+// Convierte una fecha al formato YYYY-MM-DD
+function formatearFecha(fecha) {
+  return `${fecha.getFullYear()}-${String(fecha.getMonth() + 1).padStart(2, '0')}-${String(fecha.getDate()).padStart(2, '0')}`;
+}
+
+// Carga las reservas pertenecientes al cliente
+async function cargarMisReservas(clienteId) {
   const tbody = document.getElementById('tabla-mis-reservas');
   if (!tbody) return;
 
   try {
-    const res = await fetch('/api/reservas');
+    const res = await fetch(`/api/reservas/cliente/${clienteId}`);
+
+    if (!res.ok) {
+      throw new Error('Error al obtener reservas');
+    }
+
     const reservas = await res.json();
 
-    if (!Array.isArray(reservas) || reservas.length === 0) {
-      tbody.innerHTML = '<tr><td colspan="6" style="text-align: center; color: #64748b;">No tenés reservas registradas todavía.</td></tr>';
+    if (reservas.length === 0) {
+      tbody.innerHTML = `
+        <tr>
+          <td colspan="6" style="text-align:center;color:var(--text-muted);">
+            <i class="fa-solid fa-calendar-xmark" style="margin-right:6px;color:#94a3b8;"></i>
+            No tenés reservas todavía.
+          </td>
+        </tr>
+      `;
       return;
     }
 
     tbody.innerHTML = reservas.map(r => `
       <tr>
         <td><strong>#${r.id}</strong></td>
-        <td>${r.guiaNombre || (r.guia ? r.guia.nombre : 'Guía #' + r.guiaId)}</td>
-        <td>${new Date(r.fechaExcursion).toLocaleDateString()}</td>
-        <td>${r.cantPersonas}</td>
-        <td>${r.tipoServicio}</td>
-        <td><span style="background: #fef3c7; color: #d97706; padding: 4px 8px; border-radius: 6px; font-weight: 600; font-size: 0.85rem;">${r.estado}</span></td>
+        <td>
+          <div class="reserva-guia">
+            <i class="fa-solid fa-user-tie"></i>
+            ${r.guiaNombre}
+          </div>
+        </td>
+        <td>
+          <div class="reserva-fecha">
+            <i class="fa-regular fa-calendar"></i>
+            ${new Date(r.fechaExcursion).toLocaleDateString('es-AR')}
+          </div>
+        </td>
+        <td>
+          <div class="reserva-personas">
+            <i class="fa-solid fa-users"></i>
+            ${r.cantPersonas}
+          </div>
+        </td>
+        <td>
+          <div class="reserva-servicio">
+            <i class="fa-solid fa-fish"></i>
+            ${r.tipoServicio}
+          </div>
+        </td>
+        <td>${crearBadgeEstado(r.estado)}</td>
       </tr>
     `).join('');
-  } catch (err) {
-    tbody.innerHTML = '<tr><td colspan="6" style="text-align: center; color: #ef4444;">Error al cargar tus reservas</td></tr>';
+  } catch (error) {
+    console.error(error);
+
+    tbody.innerHTML = `
+      <tr>
+        <td colspan="6" style="text-align:center;color:red;">
+          <i class="fa-solid fa-triangle-exclamation"></i>
+          Error al cargar tus reservas.
+        </td>
+      </tr>
+    `;
+  }
+}
+
+// Crea el indicador visual según el estado de la reserva
+function crearBadgeEstado(estado) {
+  const estadoNormalizado = String(estado || '').trim().toUpperCase();
+
+  switch (estadoNormalizado) {
+    case 'PENDIENTE':
+      return `
+        <span class="estado-badge estado-pendiente">
+          <i class="fa-solid fa-clock"></i>
+          Pendiente
+        </span>
+      `;
+    case 'CONFIRMADA':
+      return `
+        <span class="estado-badge estado-confirmada">
+          <i class="fa-solid fa-circle-check"></i>
+          Confirmada
+        </span>
+      `;
+    case 'CANCELADA':
+      return `
+        <span class="estado-badge estado-cancelada">
+          <i class="fa-solid fa-circle-xmark"></i>
+          Cancelada
+        </span>
+      `;
+    case 'FINALIZADA':
+      return `
+        <span class="estado-badge estado-finalizada">
+          <i class="fa-solid fa-flag-checkered"></i>
+          Finalizada
+        </span>
+      `;
+    default:
+      return `
+        <span class="estado-badge estado-default">
+          <i class="fa-solid fa-circle-info"></i>
+          ${estado || 'Sin estado'}
+        </span>
+      `;
   }
 }
