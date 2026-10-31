@@ -18,7 +18,7 @@ router.get('/', obtenerClientes);
 router.get('/:id', obtenerClientePorId);
 
 // POST → crear un nuevo cliente
-router.post('/', crearCliente);
+router.post('/:id', crearCliente);
 
 // PUT → modificar un cliente
 router.put('/:id', modificarCliente);

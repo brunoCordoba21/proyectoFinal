@@ -198,3 +198,9 @@ th {
   max-height: 90vh;
   overflow-y: auto;
 }
+.especie-image {
+  width: 100%;
+  height: auto;
+  border-radius: var(--radius);
+  margin-bottom: 15px;
+}
